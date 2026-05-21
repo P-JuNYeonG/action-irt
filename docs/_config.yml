@@ -1,0 +1,14 @@
+title: "Action-IRT"
+description: "Identifying Important Actions in Problem-Solving Process Data via an Extended Item Response Model"
+baseurl: "/action-irt"
+url: "https://P-JuNYeonG.github.io"
+theme: minima
+
+header_pages:
+  - pages/method.md
+  - pages/results.md
+  - pages/simulation.md
+  - pages/appendix.md
+
+author:
+  name: "Park, Park, Jin, & Jeon (2026)"

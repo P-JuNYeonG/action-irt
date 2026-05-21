@@ -1,0 +1,44 @@
+# ============================================================
+# Action-IRT Configuration
+# ============================================================
+# This file centralizes all hyperparameters and paths.
+# Modify values here rather than in individual scripts.
+
+# --- Model selection ---
+model:
+  name: "lstm_ae"           # Options: lstm_ae, mlp_ae, pca
+  latent_dim: 1             # D = 1, 2, 3, 4, 5
+  preprocessing: "robust"   # Options: robust, winsor, wo_pre
+
+# --- MCMC settings ---
+mcmc:
+  iterations: 50000
+  burn_in_ratio: 0.2        # burn_in = iterations × ratio
+  thin: 10
+  seed: 2025
+
+  # Proposal standard deviations (Gaussian random walk)
+  proposal_sd:
+    alpha: 1.5
+    beta: 0.5
+    w: 0.4
+
+  # Spike-and-slab prior
+  spike_variance: 0.001     # τ²
+  slab_variance: 2.5        # ν²
+
+# --- Simulation settings ---
+simulation:
+  n_seeds: 5
+  master_seed: null          # null = random seed generation
+  iterations: 50000
+  burn_in: 10000
+  thin: 10
+
+# --- Paths (adjust to your local environment) ---
+paths:
+  data_input: "data/processed/"
+  lstm_output: "data/lstm_output/"
+  mcmc_results: "results/mcmc/"
+  simulation_results: "results/simulation/"
+  figures: "analysis/figures/"

@@ -1,0 +1,59 @@
+# ============================================================
+# .gitignore for Action-IRT project
+# ============================================================
+
+# --- Raw / processed data (PIAAC license restrictions) ---
+data/
+*.csv
+*.tsv
+*.sav
+*.xlsx
+
+# --- Large MCMC output files ---
+*.RData
+*.rds
+*.rda
+
+# --- R ---
+.Rhistory
+.Rproj.user/
+.RData
+.Ruserdata
+renv/library/
+renv/staging/
+renv/sandbox/
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# --- LaTeX build artifacts ---
+manuscript/*.aux
+manuscript/*.bbl
+manuscript/*.blg
+manuscript/*.fdb_latexmk
+manuscript/*.fls
+manuscript/*.log
+manuscript/*.out
+manuscript/*.synctex.gz
+manuscript/*.toc
+manuscript/*.pdf
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- IDE ---
+.vscode/
+.idea/
+*.Rproj
+
+# --- Temporary files ---
+*.tmp
+*.bak
+*~
