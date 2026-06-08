@@ -1,0 +1,11 @@
+| event_type | description | substitute | fixed |
+|---|---|---|---|
+| toolbar | id=ss-sort | ss_sort | ss_sort-btn |
+| toolbar | id=ss-help | ss_help | ss_help-btn |
+| toolbar | id=ss-save | ss_save | ss_save-btn |
+| toolbar | id=ss-copy | ss_copy | ss_copy-btn |
+| toolbar | id=ss-paste | ss_paste | ss_paste-btn |
+| toolbar | id=ss-find | ss_find | ss_find-btn |
+| toolbar | id=ss-cut | ss_cut | ss_cut-btn |
+| button | id=sortcancel | sort_cancel | sortcancel |
+| button | id=sortvalidation | sort_validation | sortvalidation |

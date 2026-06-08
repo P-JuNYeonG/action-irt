@@ -1,0 +1,16 @@
+| event_type | description | substitute | fixed |
+|---|---|---|---|
+| toolbar | id=ss-find | ss_find | ss-find |
+| toolbar | id=ss-save | ss_save | ss-save |
+| toolbar | id=ss-sort | ss_sort | ss-sort |
+| toolbar | id=ss-help | ss_help | ss-help |
+| toolbar | id=ss-copy | ss_copy | ss-copy |
+| toolbar | id=ss-paste | ss_paste | ss-paste |
+| toolbar | id=ss-cut | ss_cut | ss-cut |
+| menu | id=wp-file-menu | wp_file-menu | wp_file-menu |
+| menu | id=ss-file-menu | ss_file-menu | ss_file-menu |
+| menu | id=ss-data-menu | ss_data-menu | ss_data-menu |
+| menu | id=ss-edit-menu | ss_edit-menu | ss_edit-menu |
+| menu | id=ss-help-menu | ss_help-menu | ss_help-menu |
+| button | id=sortcancel | sort_cancel | sortcancel |
+| button | id=sortvalidation | sort_validation | sortvalidation |

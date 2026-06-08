@@ -1,0 +1,4 @@
+| event_type | description | substitute | fixed |
+|---|---|---|---|
+| menu | id=wb-help-menu | wb_help-menu | wb_help-menu |
+| menu | id=wb-edit-menu | wb_edit-menu | wb_edit-menu |
