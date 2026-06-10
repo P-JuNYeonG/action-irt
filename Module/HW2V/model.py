@@ -19,10 +19,6 @@ class Word2VecModel:
         embed_dim (int): 임베딩 차원
         W_token (np.ndarray): 토큰 임베딩 행렬 (token_vocab_size x embed_dim)
         W_unit (np.ndarray): 유닛 임베딩 행렬 (unit_vocab_size x embed_dim)
-        
-    Note:
-        FastText 방식으로 유닛의 최종 임베딩은 구성 토큰들과 유닛 자체 임베딩의 평균입니다.
-        예: button_next = SUM([button_emb, next_emb, button_next_emb])
     """
     
     def __init__(self, token_vocab_size: int, unit_vocab_size: int, 

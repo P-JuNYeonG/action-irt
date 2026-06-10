@@ -315,7 +315,6 @@ class ActionDataLoader:
         return training_pairs
 
 
-
 # 사용 예시
 if __name__ == "__main__":
     # 테스트용 데이터 생성
@@ -361,7 +360,3 @@ open menu_edit copy_text paste_text save_file"""
     print(f"\n=== 통계 정보 ===")
     for key, value in stats.items():
         print(f"  {key}: {value}")
-    
-    # 테스트 파일 삭제
-    import os
-    os.remove("test_data.txt")

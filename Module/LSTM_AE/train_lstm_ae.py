@@ -1,13 +1,13 @@
 """
 LSTM AutoEncoder Dimension Reduction for Action Embedding Matrices
 ==================================================================
-- Input: {(SEQ_ID, problem_num): Nij x input_dim numpy array} pickle
+- Input:  {(SEQ_ID, problem_num): Nij x input_dim numpy array} pickle
 - Output: {D: {(SEQ_ID, problem_num): Nij x D numpy array}} pickle
-- 문제(problem_num)별로 data_list를 구성하여 별도 LSTM AE 학습
-- D = [1, 2, 3, 4, 5] 비교
-- StandardScaler 미적용 (시간 정보가 이미 임베딩 스케일로 조정됨)
-- pack_padded_sequence로 padding의 bias term 오염 방지
-- 문제별 학습 곡선(loss curve) 시각화 포함
+- A separate LSTM AE is trained for each item (problem_num)
+- Latent dimensions compared: D = [1, 2, 3, 4, 5]
+- StandardScaler not applied (temporal features are already on embedding scale)
+- pack_padded_sequence used to prevent padding positions from corrupting bias terms
+- Per-item training loss curves included
 """
 
 import argparse
@@ -30,12 +30,12 @@ warnings.filterwarnings('ignore')
 
 
 # ============================================================
-# 1. 시퀀스 Dataset (padding + 길이 정보 포함)
+# 1. Sequence Dataset (with padding and length information)
 # ============================================================
 class SequenceDataset(Dataset):
     """
-    가변 길이 시퀀스를 배치로 묶기 위한 Dataset.
-    collate_fn에서 padding을 수행한다.
+    Dataset for batching variable-length sequences.
+    Padding is handled in the collate_fn.
     """
 
     def __init__(self, sequences: List[np.ndarray]):
@@ -43,7 +43,7 @@ class SequenceDataset(Dataset):
         Parameters
         ----------
         sequences : list of np.ndarray
-            각 원소가 Nij × input_dim 행렬인 리스트
+            List of matrices, each of shape Nij x input_dim.
         """
         self.sequences = [
             torch.FloatTensor(seq.astype(np.float32)) for seq in sequences
@@ -59,20 +59,20 @@ class SequenceDataset(Dataset):
 
 def collate_fn(batch):
     """
-    가변 길이 시퀀스를 padding하여 배치로 묶는 함수.
-    길이 내림차순으로 정렬 (pack_padded_sequence 요구사항).
+    Pads variable-length sequences and collates them into a batch.
+    Sequences are sorted in descending order of length
+    as required by pack_padded_sequence.
 
     Returns
     -------
-    padded : (batch_size, max_len, input_dim)
-    lengths : list of int (내림차순 정렬)
-    sort_indices : 원래 순서 복원용 인덱스
+    padded  : (batch_size, max_len, input_dim)
+    lengths : list of int (descending order)
     """
-    # 길이 내림차순 정렬
+    # Sort by descending length (required by pack_padded_sequence)
     batch.sort(key=lambda x: x[1], reverse=True)
     sequences, lengths = zip(*batch)
 
-    max_len = lengths[0]  # 정렬 후 첫 번째가 최장
+    max_len   = lengths[0]
     input_dim = sequences[0].shape[1]
     batch_size = len(sequences)
 
@@ -84,24 +84,22 @@ def collate_fn(batch):
 
 
 # ============================================================
-# 2. LSTM AutoEncoder 모델 정의
+# 2. LSTM AutoEncoder
 # ============================================================
 class LSTMAutoEncoder(nn.Module):
     """
-    LSTM AutoEncoder for Action Embedding Sequences.
+    LSTM AutoEncoder for action embedding sequences.
 
-    구조:
+    Architecture:
         Encoder: LSTM(input=input_dim, hidden=64) -> FC(64 -> D)
         Decoder: FC(D -> 64) -> LSTM(input=64, hidden=64) -> FC(64 -> input_dim)
 
-    - pack_padded_sequence를 사용하여 padding 위치에서
-      LSTM 연산을 수행하지 않음 (bias term 오염 방지)
-    - 시점별(time-step-wise) latent 출력: Nij x D
+    - Produces time-step-wise latent outputs of shape Nij x D.
     """
 
     def __init__(self, input_dim: int = 23, hidden_dim: int = 64, latent_dim: int = 1):
         super().__init__()
-        self.input_dim = input_dim
+        self.input_dim  = input_dim
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
 
@@ -115,8 +113,8 @@ class LSTMAutoEncoder(nn.Module):
         self.encoder_fc = nn.Linear(hidden_dim, latent_dim)
 
         # Decoder
-        self.decoder_fc_in = nn.Linear(latent_dim, hidden_dim)
-        self.decoder_lstm = nn.LSTM(
+        self.decoder_fc_in  = nn.Linear(latent_dim, hidden_dim)
+        self.decoder_lstm   = nn.LSTM(
             input_size=hidden_dim,
             hidden_size=hidden_dim,
             num_layers=1,
@@ -128,24 +126,20 @@ class LSTMAutoEncoder(nn.Module):
         """
         Parameters
         ----------
-        x_packed : PackedSequence 또는 (batch_size, max_len, input_dim)
-        lengths : list of int
+        x_packed : PackedSequence or (batch_size, max_len, input_dim)
+        lengths  : list of int
 
         Returns
         -------
         latent_padded : (batch_size, max_len, latent_dim)
         """
-        # Encoder LSTM
         if isinstance(x_packed, torch.nn.utils.rnn.PackedSequence):
             enc_out_packed, _ = self.encoder_lstm(x_packed)
         else:
             packed = pack_padded_sequence(x_packed, lengths, batch_first=True, enforce_sorted=True)
             enc_out_packed, _ = self.encoder_lstm(packed)
 
-        # Unpack → (batch_size, max_len, hidden_dim)
         enc_out_padded, _ = pad_packed_sequence(enc_out_packed, batch_first=True)
-
-        # FC → latent (batch_size, max_len, latent_dim)
         latent_padded = self.encoder_fc(enc_out_padded)
 
         return latent_padded
@@ -155,21 +149,16 @@ class LSTMAutoEncoder(nn.Module):
         Parameters
         ----------
         latent_padded : (batch_size, max_len, latent_dim)
-        lengths : list of int
+        lengths       : list of int
 
         Returns
         -------
         recon_padded : (batch_size, max_len, input_dim)
         """
-        # FC → hidden dim
-        dec_input = torch.relu(self.decoder_fc_in(latent_padded))
-
-        # Pack → Decoder LSTM → Unpack
-        dec_packed = pack_padded_sequence(dec_input, lengths, batch_first=True, enforce_sorted=True)
+        dec_input    = torch.relu(self.decoder_fc_in(latent_padded))
+        dec_packed   = pack_padded_sequence(dec_input, lengths, batch_first=True, enforce_sorted=True)
         dec_out_packed, _ = self.decoder_lstm(dec_packed)
         dec_out_padded, _ = pad_packed_sequence(dec_out_packed, batch_first=True)
-
-        # FC → reconstruction
         recon_padded = self.decoder_fc_out(dec_out_padded)
 
         return recon_padded
@@ -179,18 +168,16 @@ class LSTMAutoEncoder(nn.Module):
         Parameters
         ----------
         x_padded : (batch_size, max_len, input_dim)
-        lengths : list of int
+        lengths  : list of int
 
         Returns
         -------
-        recon_padded : (batch_size, max_len, input_dim)
+        recon_padded  : (batch_size, max_len, input_dim)
         latent_padded : (batch_size, max_len, latent_dim)
         """
-        # Pack input
-        x_packed = pack_padded_sequence(x_padded, lengths, batch_first=True, enforce_sorted=True)
-
+        x_packed      = pack_padded_sequence(x_padded, lengths, batch_first=True, enforce_sorted=True)
         latent_padded = self.encode(x_packed, lengths)
-        recon_padded = self.decode(latent_padded, lengths)
+        recon_padded  = self.decode(latent_padded, lengths)
 
         return recon_padded, latent_padded
 
@@ -200,22 +187,22 @@ class LSTMAutoEncoder(nn.Module):
 # ============================================================
 def masked_mse_loss(recon, target, lengths):
     """
-    Padding 위치를 제외한 MSE loss 계산.
+    Computes MSE loss excluding padded positions.
 
     Parameters
     ----------
-    recon : (batch_size, max_len, input_dim)
-    target : (batch_size, max_len, input_dim)
+    recon   : (batch_size, max_len, input_dim)
+    target  : (batch_size, max_len, input_dim)
     lengths : list of int
     """
     batch_size, max_len, input_dim = target.shape
 
-    # mask: (batch_size, max_len, 1) → broadcast over input_dim
+    # mask: (batch_size, max_len, 1) -> broadcast over input_dim
     mask = torch.zeros(batch_size, max_len, 1, device=target.device)
     for i, length in enumerate(lengths):
         mask[i, :length, :] = 1.0
 
-    # MSE only on valid positions
+    # MSE only on valid (non-padded) positions
     sq_error = (recon - target) ** 2 * mask
     loss = sq_error.sum() / (mask.sum() * input_dim)
 
@@ -223,12 +210,12 @@ def masked_mse_loss(recon, target, lengths):
 
 
 # ============================================================
-# 4. LSTM AE Reducer 클래스 (단일 문제용)
+# 4. LSTM AE Reducer (single-item wrapper)
 # ============================================================
 class LSTMAEReducer:
     """
-    단일 문제에 대해 LSTM AutoEncoder 학습/변환을 수행하는 클래스.
-    인터페이스: PCAReducer, MLPAEReducer와 동일 (fit, transform)
+    Trains and applies an LSTM AutoEncoder for a single item.
+    Shares the same fit/transform interface as PCAReducer and MLPAEReducer.
     """
 
     def __init__(self,
@@ -245,36 +232,26 @@ class LSTMAEReducer:
         """
         Parameters
         ----------
-        D : int
-            latent dimension
-        input_dim : int
-            입력 차원
-        hidden_dim : int
-            LSTM hidden state 차원 (64)
-        epochs : int
-            최대 학습 에포크
-        batch_size : int
-            배치 크기 (시퀀스 단위이므로 MLP AE보다 작게 설정)
-        lr : float
-            학습률
-        weight_decay : float
-            L2 정규화
-        patience : int
-            Early stopping patience
-        device : str, optional
-            'cuda' or 'cpu'
-        seed : int
-            재현성 시드
+        D            : int   -- latent dimension
+        input_dim    : int   -- input feature dimension
+        hidden_dim   : int   -- LSTM hidden state dimension
+        epochs       : int   -- maximum training epochs
+        batch_size   : int   -- batch size (sequence-level; smaller than MLP AE)
+        lr           : float -- learning rate
+        weight_decay : float -- L2 regularization coefficient
+        patience     : int   -- early stopping patience
+        device       : str, optional -- 'cuda' or 'cpu'
+        seed         : int   -- random seed for reproducibility
         """
-        self.D = D
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.epochs = epochs
-        self.batch_size = batch_size
-        self.lr = lr
+        self.D            = D
+        self.input_dim    = input_dim
+        self.hidden_dim   = hidden_dim
+        self.epochs       = epochs
+        self.batch_size   = batch_size
+        self.lr           = lr
         self.weight_decay = weight_decay
-        self.patience = patience
-        self.seed = seed
+        self.patience     = patience
+        self.seed         = seed
 
         if device is None:
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -297,9 +274,9 @@ class LSTMAEReducer:
         Parameters
         ----------
         data_list : list of np.ndarray
-            각 원소가 Nij x input_dim 행렬인 리스트 (시퀀스 단위)
+            List of matrices of shape Nij x input_dim (one per sequence).
         val_ratio : float
-            validation set 비율
+            Fraction of sequences used for validation.
         """
         self._set_seed()
 
@@ -307,22 +284,22 @@ class LSTMAEReducer:
         if n_sequences == 0:
             raise ValueError("data_list is empty.")
 
-        # Train / Validation 분리 (시퀀스 단위)
+        # Train / Validation split (sequence level)
         indices = np.random.permutation(n_sequences)
         if n_sequences == 1:
-            val_indices = indices
+            val_indices   = indices
             train_indices = indices
         else:
             n_val = max(1, int(n_sequences * val_ratio))
             n_val = min(n_val, n_sequences - 1)
-            val_indices = indices[:n_val]
+            val_indices   = indices[:n_val]
             train_indices = indices[n_val:]
 
         train_sequences = [data_list[i] for i in train_indices]
-        val_sequences = [data_list[i] for i in val_indices]
+        val_sequences   = [data_list[i] for i in val_indices]
 
         train_dataset = SequenceDataset(train_sequences)
-        val_dataset = SequenceDataset(val_sequences)
+        val_dataset   = SequenceDataset(val_sequences)
 
         train_loader = DataLoader(
             train_dataset,
@@ -332,7 +309,6 @@ class LSTMAEReducer:
             drop_last=False
         )
 
-        # 모델 초기화
         self.model = LSTMAutoEncoder(
             input_dim=self.input_dim,
             hidden_dim=self.hidden_dim,
@@ -345,18 +321,17 @@ class LSTMAEReducer:
             weight_decay=self.weight_decay
         )
 
-        # 학습
-        self.train_losses = []
-        self.val_losses = []
-        best_val_loss = float('inf')
-        best_state_dict = None
-        patience_counter = 0
+        self.train_losses  = []
+        self.val_losses    = []
+        best_val_loss      = float('inf')
+        best_state_dict    = None
+        patience_counter   = 0
 
         for epoch in range(self.epochs):
             # --- Train ---
             self.model.train()
             epoch_loss = 0.0
-            n_batches = 0
+            n_batches  = 0
 
             for padded, lengths in train_loader:
                 padded = padded.to(self.device)
@@ -368,7 +343,7 @@ class LSTMAEReducer:
                 optimizer.step()
 
                 epoch_loss += loss.item()
-                n_batches += 1
+                n_batches  += 1
 
             train_loss = epoch_loss / n_batches
             self.train_losses.append(train_loss)
@@ -381,9 +356,9 @@ class LSTMAEReducer:
 
             # --- Early Stopping ---
             if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                best_state_dict = {k: v.cpu().clone() for k, v in self.model.state_dict().items()}
-                self.best_epoch = epoch + 1
+                best_val_loss    = val_loss
+                best_state_dict  = {k: v.cpu().clone() for k, v in self.model.state_dict().items()}
+                self.best_epoch  = epoch + 1
                 patience_counter = 0
             else:
                 patience_counter += 1
@@ -393,20 +368,21 @@ class LSTMAEReducer:
                       f"(best epoch: {self.best_epoch}, best val loss: {best_val_loss:.6f})")
                 break
 
-        # best 모델 복원
+        # Restore best model
         if best_state_dict is not None:
             self.model.load_state_dict(best_state_dict)
             self.model.to(self.device)
 
         total_actions = sum(seq.shape[0] for seq in data_list)
-        print(f"    학습 완료 | 시퀀스 수: {n_sequences} (train: {len(train_indices)}, "
-              f"val: {len(val_indices)}) | 총 행동 수: {total_actions} | "
+        print(f"    Training complete | sequences: {n_sequences} "
+              f"(train: {len(train_indices)}, val: {len(val_indices)}) | "
+              f"total actions: {total_actions} | "
               f"best epoch: {self.best_epoch} | "
               f"train loss: {self.train_losses[self.best_epoch-1]:.6f} | "
               f"val loss: {best_val_loss:.6f}")
 
     def _evaluate(self, dataset: SequenceDataset) -> float:
-        """Validation set에 대한 masked MSE 계산"""
+        """Compute masked MSE on the validation set."""
         loader = DataLoader(
             dataset,
             batch_size=self.batch_size,
@@ -416,14 +392,14 @@ class LSTMAEReducer:
         )
 
         total_loss = 0.0
-        n_batches = 0
+        n_batches  = 0
 
         for padded, lengths in loader:
             padded = padded.to(self.device)
             recon, _ = self.model(padded, lengths)
             loss = masked_mse_loss(recon, padded, lengths)
             total_loss += loss.item()
-            n_batches += 1
+            n_batches  += 1
 
         return total_loss / max(n_batches, 1)
 
@@ -432,27 +408,27 @@ class LSTMAEReducer:
         Parameters
         ----------
         data_list : list of np.ndarray
-            각 원소가 Nij x input_dim 행렬인 리스트
+            List of matrices of shape Nij x input_dim.
 
         Returns
         -------
         list of np.ndarray
-            각 원소가 Nij x D 행렬인 리스트 (입력과 동일한 순서)
+            List of matrices of shape Nij x D (same order as input).
         """
         if self.model is None:
-            raise ValueError("fit()을 먼저 수행하세요.")
+            raise ValueError("Call fit() before transform().")
 
         self.model.eval()
         results = []
 
         with torch.no_grad():
             for matrix in data_list:
-                # 단일 시퀀스를 배치 차원 추가: (1, Nij, input_dim)
-                x = torch.FloatTensor(matrix.astype(np.float32)).unsqueeze(0).to(self.device)
+                # Single sequence: add batch dimension -> (1, Nij, input_dim)
+                x       = torch.FloatTensor(matrix.astype(np.float32)).unsqueeze(0).to(self.device)
                 lengths = [matrix.shape[0]]
 
                 x_packed = pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=True)
-                latent = self.model.encode(x_packed, lengths)
+                latent   = self.model.encode(x_packed, lengths)
 
                 # (1, Nij, D) -> (Nij, D)
                 results.append(latent.squeeze(0).cpu().numpy())
@@ -464,16 +440,16 @@ class LSTMAEReducer:
         return self.transform(data_list)
 
     def get_reconstruction_error(self, data_list: List[np.ndarray]) -> List[np.ndarray]:
-        """각 시퀀스의 행동별 reconstruction error 반환 (진단용)"""
+        """Return per-action reconstruction error for each sequence (for diagnostics)."""
         if self.model is None:
-            raise ValueError("fit()을 먼저 수행하세요.")
+            raise ValueError("Call fit() before get_reconstruction_error().")
 
         self.model.eval()
         errors = []
 
         with torch.no_grad():
             for matrix in data_list:
-                x = torch.FloatTensor(matrix.astype(np.float32)).unsqueeze(0).to(self.device)
+                x       = torch.FloatTensor(matrix.astype(np.float32)).unsqueeze(0).to(self.device)
                 lengths = [matrix.shape[0]]
 
                 recon, _ = self.model(x, lengths)
@@ -484,7 +460,7 @@ class LSTMAEReducer:
 
 
 # ============================================================
-# 5. 학습 곡선 시각화 (개별 문제용)
+# 5. Loss curve visualization (single item)
 # ============================================================
 def plot_loss_curve_single(problem_num: str,
                            train_losses: List[float],
@@ -492,12 +468,12 @@ def plot_loss_curve_single(problem_num: str,
                            best_epoch: int,
                            D: int,
                            save_path: Optional[str] = None) -> None:
-    """단일 문제, 단일 D에 대한 학습 곡선"""
+    """Plot training and validation loss curve for a single item and latent dimension."""
     fig, ax = plt.subplots(1, 1, figsize=(8, 5))
 
     epochs = range(1, len(train_losses) + 1)
     ax.plot(epochs, train_losses, label='Train Loss', color='steelblue', linewidth=1.5)
-    ax.plot(epochs, val_losses, label='Val Loss', color='coral', linewidth=1.5)
+    ax.plot(epochs, val_losses,   label='Val Loss',   color='coral',     linewidth=1.5)
     ax.axvline(x=best_epoch, color='red', linestyle='--', alpha=0.5, label=f'Best Epoch ({best_epoch})')
 
     ax.set_xlabel('Epoch', fontsize=11)
@@ -507,22 +483,21 @@ def plot_loss_curve_single(problem_num: str,
     ax.grid(alpha=0.3)
 
     plt.tight_layout()
-
     if save_path:
         fig.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close(fig)
 
 
 # ============================================================
-# 6. 전체 문제 × D 종합 학습 곡선
+# 6. Loss curve visualization (all items x D)
 # ============================================================
 def plot_loss_curves_all(problem_reducers: Dict[str, Dict[int, LSTMAEReducer]],
                          save_path: Optional[str] = None) -> None:
-    """모든 문제 × D 조합의 학습 곡선을 하나의 figure에 생성"""
+    """Plot loss curves for all item x latent-dimension combinations in a single figure."""
     problem_nums = sorted(problem_reducers.keys())
-    D_list = sorted(list(problem_reducers[problem_nums[0]].keys()))
-    n_problems = len(problem_nums)
-    n_D = len(D_list)
+    D_list       = sorted(list(problem_reducers[problem_nums[0]].keys()))
+    n_problems   = len(problem_nums)
+    n_D          = len(D_list)
 
     fig, axes = plt.subplots(n_problems, n_D, figsize=(4 * n_D, 3 * n_problems))
     if n_problems == 1:
@@ -532,12 +507,12 @@ def plot_loss_curves_all(problem_reducers: Dict[str, Dict[int, LSTMAEReducer]],
 
     for i, problem_num in enumerate(problem_nums):
         for j, D in enumerate(D_list):
-            ax = axes[i, j]
+            ax      = axes[i, j]
             reducer = problem_reducers[problem_num][D]
 
             epochs = range(1, len(reducer.train_losses) + 1)
             ax.plot(epochs, reducer.train_losses, color='steelblue', linewidth=1, label='Train')
-            ax.plot(epochs, reducer.val_losses, color='coral', linewidth=1, label='Val')
+            ax.plot(epochs, reducer.val_losses,   color='coral',     linewidth=1, label='Val')
             ax.axvline(x=reducer.best_epoch, color='red', linestyle='--', alpha=0.4, linewidth=0.8)
 
             ax.set_title(f'{problem_num} | D={D}', fontsize=9, fontweight='bold')
@@ -551,22 +526,22 @@ def plot_loss_curves_all(problem_reducers: Dict[str, Dict[int, LSTMAEReducer]],
             if j == 0:
                 ax.set_ylabel('Masked MSE', fontsize=8)
 
-    fig.suptitle('LSTM AE Loss Curves (All Problems × D)',
+    fig.suptitle('LSTM AE Loss Curves (All Problems x D)',
                  fontsize=14, fontweight='bold', y=1.02)
     plt.tight_layout()
 
     if save_path:
         fig.savefig(save_path, dpi=150, bbox_inches='tight')
-        print(f"\n종합 Loss curve 저장: {save_path}")
+        print(f"\nSaved combined loss curve: {save_path}")
     plt.close(fig)
 
 
 # ============================================================
-# 7. 결과 요약 출력
+# 7. Summary
 # ============================================================
 def print_summary(problem_reducers: Dict[str, Dict[int, LSTMAEReducer]],
                   D_list: List[int]) -> None:
-    """문제별, D별 최종 validation loss 요약"""
+    """Print a table of best-epoch validation losses for each item and latent dimension."""
     problem_nums = sorted(problem_reducers.keys())
 
     print("\n" + "=" * 70)
@@ -581,7 +556,7 @@ def print_summary(problem_reducers: Dict[str, Dict[int, LSTMAEReducer]],
         row = f"{str(problem_num):<15}"
         for d in D_list:
             if d in problem_reducers[problem_num]:
-                reducer = problem_reducers[problem_num][d]
+                reducer  = problem_reducers[problem_num][d]
                 best_val = reducer.val_losses[reducer.best_epoch - 1]
                 row += f"{best_val:<14.6f}"
             else:
@@ -598,7 +573,7 @@ def parse_int_list(value: str) -> List[int]:
 def infer_problems(data: Dict[Tuple, np.ndarray], item_group: Optional[str]) -> List[str]:
     problems = sorted({key[1] for key in data.keys()})
     if item_group:
-        prefix = f"{item_group}_"
+        prefix   = f"{item_group}_"
         problems = [problem for problem in problems if str(problem).startswith(prefix)]
     return problems
 
@@ -621,21 +596,21 @@ def run_lstm_ae(
 ) -> None:
     os.makedirs(output_dir, exist_ok=True)
     model_dir = os.path.join(output_dir, "models")
-    loss_dir = os.path.join(output_dir, "loss_curves")
+    loss_dir  = os.path.join(output_dir, "loss_curves")
     if save_models:
         os.makedirs(model_dir, exist_ok=True)
     if save_plots:
         os.makedirs(loss_dir, exist_ok=True)
 
     sample_matrix = next(iter(data.values()))
-    input_dim = int(sample_matrix.shape[1])
+    input_dim     = int(sample_matrix.shape[1])
 
     print("=" * 70)
     print("LSTM AutoEncoder dimension reduction")
     print("=" * 70)
     print(f"  Sequences: {len(data):,}")
     print(f"  Input dim: {input_dim}")
-    print(f"  Problems: {', '.join(map(str, problems))}")
+    print(f"  Problems:  {', '.join(map(str, problems))}")
     print(f"  Latent dims: {', '.join(map(str, d_list))}")
     print(f"  Device: {torch.device('cuda' if torch.cuda.is_available() else 'cpu')}")
 
@@ -651,8 +626,8 @@ def run_lstm_ae(
         print(f"  [{prob_idx + 1}/{len(problems)}] item '{target_problem}'")
         print(f"{'=' * 50}")
 
-        data_list = []
-        keys_list = []
+        data_list  = []
+        keys_list  = []
         for key, matrix in data.items():
             if key[1] == target_problem:
                 data_list.append(matrix)
@@ -727,21 +702,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Train item-wise LSTM autoencoders for action embedding matrices."
     )
-    parser.add_argument("--input-pkl", required=True, help="Pickle containing {(seq_id, item): matrix}.")
-    parser.add_argument("--output-dir", default="outputs/lstm_ae", help="Directory for reduced outputs.")
-    parser.add_argument("--items", default=None, help="Comma-separated item IDs, e.g. ps1_1,ps1_2.")
-    parser.add_argument("--item-group", default=None, help="Optional item prefix such as ps1 or ps2.")
-    parser.add_argument("--latent-dims", default="1,2,3,4,5", help="Comma-separated latent dimensions.")
-    parser.add_argument("--hidden-dim", type=int, default=64)
-    parser.add_argument("--epochs", type=int, default=200)
-    parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--weight-decay", type=float, default=1e-5)
-    parser.add_argument("--patience", type=int, default=20)
-    parser.add_argument("--val-ratio", type=float, default=0.1)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--input-pkl",     required=True,          help="Pickle containing {(seq_id, item): matrix}.")
+    parser.add_argument("--output-dir",    default="outputs/lstm_ae", help="Directory for reduced outputs.")
+    parser.add_argument("--items",         default=None,           help="Comma-separated item IDs, e.g. ps1_1,ps1_2.")
+    parser.add_argument("--item-group",    default=None,           help="Optional item prefix such as ps1 or ps2.")
+    parser.add_argument("--latent-dims",   default="1,2,3,4,5",   help="Comma-separated latent dimensions.")
+    parser.add_argument("--hidden-dim",    type=int,   default=64)
+    parser.add_argument("--epochs",        type=int,   default=200)
+    parser.add_argument("--batch-size",    type=int,   default=64)
+    parser.add_argument("--lr",            type=float, default=1e-3)
+    parser.add_argument("--weight-decay",  type=float, default=1e-5)
+    parser.add_argument("--patience",      type=int,   default=20)
+    parser.add_argument("--val-ratio",     type=float, default=0.1)
+    parser.add_argument("--seed",          type=int,   default=42)
     parser.add_argument("--no-save-models", action="store_true")
-    parser.add_argument("--no-save-plots", action="store_true")
+    parser.add_argument("--no-save-plots",  action="store_true")
     return parser.parse_args()
 
 
@@ -780,10 +755,10 @@ def main() -> None:
 if __name__ == "__main__":
     main()
     print("=" * 70)
-    print(f"\n저장된 파일 목록:")
+    print(f"\nSaved files:")
     for root, dirs, files in os.walk(save_dir):
         for fname in sorted(files):
-            fpath = os.path.join(root, fname)
-            fsize = os.path.getsize(fpath) / 1024
+            fpath    = os.path.join(root, fname)
+            fsize    = os.path.getsize(fpath) / 1024
             rel_path = os.path.relpath(fpath, save_dir)
             print(f"  {rel_path} ({fsize:.1f} KB)")

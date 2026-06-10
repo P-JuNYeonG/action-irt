@@ -389,30 +389,6 @@ def main():
     
     print("=" * 70)
 
-
-'''
-사용 예시:
-
-# Validation 사용 (기본)
-python modified_main.py \
-    --input_file data.txt \
-    --output_dir output/ \
-    --train_ratio 0.8 \
-    --embed_dim 50 \
-    --window_size 1 \
-    --epochs 10 \
-    --early_stopping \
-    --patience 3
-
-# Validation 사용 안 함 (전체 데이터 학습)
-python modified_main.py \
-    --input_file data.txt \
-    --output_dir output/ \
-    --no_validation \
-    --epochs 50
-'''
-
-
 if __name__ == "__main__":
     try:
         main()

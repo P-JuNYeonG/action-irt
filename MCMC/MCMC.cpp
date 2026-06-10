@@ -7,30 +7,30 @@ using namespace std;
 // [[Rcpp::depends("RcppArmadillo")]]
 
 // =============================================================================
-// 모델 구조 (Multi-dimensional Action IRT)
+// Model Structure (Multi-dimensional Action IRT)
 // =============================================================================
 // Fixed effect Beta / Random effect Alpha
 // logit(pi_ij) = alpha_i + beta_j + sum_{l=1}^{N_j} sum_{d=1}^{D} w^(d)_jl * C_bar^(d)_ijl * I(l in A_ij)
 //
-// alpha_i ~ N(0, sigma_alpha)                 : 응답자 능력
-// beta_j  ~ N(0, 1)                        : 문제 난이도 (fixed prior, 1 = 1)
-// w^(d)_jl | lambda^(d)_jl ~ spike-and-slab   : 행동 가중치 (차원별 독립)
+// alpha_i ~ N(0, sigma_alpha)                 : respondent ability
+// beta_j  ~ N(0, 1)                           : item difficulty (fixed prior, variance = 1)
+// w^(d)_jl | lambda^(d)_jl ~ spike-and-slab   : action weight (independent across dimensions)
 // lambda^(d)_jl ~ Bernoulli(0.5)
 // sigma_alpha ~ Inverse-Gamma(2, 1)
 //
 //
 // =============================================================================
-// 데이터 구조 (펼치기 전략: action-major ordering)
+// Data Structure (flattening strategy: action-major ordering)
 // =============================================================================
-// data: (n_resp × n_prob) 응답 행렬
-// C_sum_list[[j]]: (n_resp × N_j * D) 행렬
-//   열 순서: [l=0,d=0] [l=0,d=1] ... [l=0,d=D-1] [l=1,d=0] ... [l=N_j-1,d=D-1]
-//   인덱싱: col_index = l * D + d
-// N_j_vec: (n_prob,) 각 문제의 고유 행동 종류 수 (펼치기 전 기준)
-// D: latent dimension 수
+// data: (n_resp x n_prob) response matrix
+// C_sum_list[[j]]: (n_resp x N_j * D) matrix
+//   column order: [l=0,d=0] [l=0,d=1] ... [l=0,d=D-1] [l=1,d=0] ... [l=N_j-1,d=D-1]
+//   indexing: col_index = l * D + d
+// N_j_vec: (n_prob,) number of unique action types per item (before flattening)
+// D: number of latent dimensions
 
 // =============================================================================
-// 수치 안정성 함수
+// Numerically Stable Helper Functions
 // =============================================================================
 
 inline double log_sigmoid(double x) {
@@ -58,13 +58,13 @@ inline double log_lik_single(double y, double eta) {
 }
 
 // =============================================================================
-// 1. 로그 사후확률 계산 함수들
+// 1. Log Posterior Computation Functions
 // =============================================================================
 
-// Beta_j의 로그 사후확률
+// Log posterior for Beta_j
 // eta_ij = alpha_i + beta_j + WC_cache_j[i]
 // [[Rcpp::export]]
-double log_post_beta_v5(const vec& data_j,
+double log_post_beta(const vec& data_j,
                         double candi_beta,
                         const vec& alpha,
                         const vec& WC_cache,
@@ -83,9 +83,9 @@ double log_post_beta_v5(const vec& data_j,
   return log_likelihood + log_prior;
 }
 
-// Alpha_i의 로그 사후확률
+// Log posterior for Alpha_i
 // [[Rcpp::export]]
-double log_post_alpha_v5(const vec& data_i,
+double log_post_alpha(const vec& data_i,
                          double candi_alpha,
                          const vec& beta,
                          const vec& WC_i_vec,
@@ -104,11 +104,11 @@ double log_post_alpha_v5(const vec& data_i,
   return log_likelihood + log_prior;
 }
 
-// W^(d)_jl의 로그 사후확률 (증분 계산)
-// 단일 (j, l, d) 성분에 대한 업데이트
-// C_sum_col: C_sum_list[j]의 (l*D+d)번째 열
+// Log posterior for W^(d)_jl (incremental computation)
+// Update for a single (j, l, d) component
+// C_sum_col: the (l*D+d)-th column of C_sum_list[j]
 // [[Rcpp::export]]
-double log_post_w_v5(const vec& data_j,
+double log_post_w(const vec& data_j,
                      double candi_w,
                      double current_w,
                      const vec& alpha,
@@ -137,73 +137,73 @@ double log_post_w_v5(const vec& data_j,
 }
 
 // =============================================================================
-// 2. 캐시 관리 함수들
+// 2. Cache Management Functions
 // =============================================================================
 
-// WC_cache 초기 계산
-// C_sum_j: (n_resp × N_j*D), W_j: (N_j*D,)
+// Initial computation of WC_cache
+// C_sum_j: (n_resp x N_j*D), W_j: (N_j*D,)
 // WC_cache[i] = sum_{l,d} W_j[l*D+d] * C_sum_j(i, l*D+d)
 vec compute_WC_cache(const mat& C_sum_j, const vec& W_j) {
   return C_sum_j * W_j;
 }
 
-// 단일 성분 업데이트
+// Incremental update for a single component
 void update_WC_cache(vec& WC_cache, const vec& C_sum_col, double delta_w) {
   WC_cache += delta_w * C_sum_col;
 }
 
 // =============================================================================
-// 3. 메인 MCMC 함수
+// 3. Main MCMC Sampler
 // =============================================================================
 
 // [[Rcpp::export]]
-List MCMC_action_model_v5(int N_iter,
-                          mat data,                    // (n_resp × n_prob)
-                          vector<mat> C_sum_list,      // C_sum_list[[j]]: (n_resp × N_j*D) - 펼친 행렬
-                          vec N_j_vec,                 // (n_prob,) 각 문제별 행동 종류 수 (펼치기 전)
-                          int D,                       // latent dimension 수
+List MCMC_action_model(int N_iter,
+                          mat data,                    // (n_resp x n_prob) response matrix
+                          vector<mat> C_sum_list,      // C_sum_list[[j]]: (n_resp x N_j*D) flattened matrix
+                          vec N_j_vec,                 // (n_prob,) number of unique action types per item (before flattening)
+                          int D,                       // number of latent dimensions
                           vec alpha_init,              // (n_resp,)
                           vec beta_init,               // (n_prob,)
-                          vector<vec> W_init,          // W_init[[j]]: (N_j*D,) - 펼친 벡터
-                          vector<vec> lambda_init,     // lambda_init[[j]]: (N_j*D,) - 펼친 벡터
+                          vector<vec> W_init,          // W_init[[j]]: (N_j*D,) flattened vector
+                          vector<vec> lambda_init,     // lambda_init[[j]]: (N_j*D,) flattened vector
                           double sigma_alpha_init,
-                          double tau2,                 // spike 분산
-                          double nu2,                  // slab 분산
+                          double tau2,                 // spike variance
+                          double nu2,                  // slab variance
                           double proposal_sd_alpha = 0.4,
                           double proposal_sd_beta = 0.4,
                           double proposal_sd_w = 0.4,
-                          int burn_in = 0,              // burn-in 기간
-                          int thin = 1) {               // thinning 간격
+                          int burn_in = 0,             // burn-in period
+                          int thin = 1) {              // thinning interval
   
   int n_resp = data.n_rows;
   int n_prob = data.n_cols;
   
-  // 현재 파라미터
+  // Current parameter values
   vec now_alpha = alpha_init;
   vec now_beta = beta_init;
-  vector<vec> now_W = W_init;          // now_W[j]: 길이 N_j*D
-  vector<vec> now_lambda = lambda_init; // now_lambda[j]: 길이 N_j*D
+  vector<vec> now_W = W_init;           // now_W[j]: length N_j*D
+  vector<vec> now_lambda = lambda_init; // now_lambda[j]: length N_j*D
   double now_sigma_alpha = sigma_alpha_init;
   
-  // beta prior: N(0, 1) 고정
+  // Beta prior: fixed as N(0, 1)
   double now_sigma_beta = 1.0;
   
   // ==========================================================================
-  // 캐시 초기화
+  // Initialize WC cache
   // ==========================================================================
   vector<vec> WC_caches(n_prob);
   for (int j = 0; j < n_prob; j++) {
     WC_caches[j] = compute_WC_cache(C_sum_list[j], now_W[j]);
   }
   
-  // W의 총 차원 계산 (펼친 후 기준: sum(N_j) * D)
+  // Compute total number of flattened W parameters: sum(N_j) * D
   int w_total_flat = 0;
   for (int j = 0; j < n_prob; j++) {
     w_total_flat += (int)N_j_vec[j] * D;
   }
   
   // ==========================================================================
-  // 결과 저장 (burn-in 이후, thinning 적용)
+  // Allocate result storage (post burn-in, with thinning)
   // ==========================================================================
   int n_save = 0;
   for (int iter = burn_in; iter < N_iter; iter++) {
@@ -218,12 +218,12 @@ List MCMC_action_model_v5(int N_iter,
   
   int save_idx = 0;
   
-  // 수락률 카운터
+  // Acceptance rate counters
   vec accept_alpha = zeros(n_resp);
   vec accept_beta = zeros(n_prob);
   vec accept_w = zeros(w_total_flat);
   
-  // MCMC 반복
+  // MCMC iterations
   for (int iter = 0; iter < N_iter; iter++) {
     
     if ((iter + 1) % 500 == 0) {
@@ -231,14 +231,14 @@ List MCMC_action_model_v5(int N_iter,
     }
     
     // =========================================================================
-    // Step 1: Beta 업데이트 (MH) - fixed prior N(0, 1)
+    // Step 1: Update Beta (MH) - fixed prior N(0, 1)
     // =========================================================================
     for (int j = 0; j < n_prob; j++) {
       double candi_beta = R::rnorm(now_beta[j], proposal_sd_beta);
       
-      double log_num = log_post_beta_v5(data.col(j), candi_beta,
+      double log_num = log_post_beta(data.col(j), candi_beta,
                                         now_alpha, WC_caches[j], now_sigma_beta);
-      double log_den = log_post_beta_v5(data.col(j), now_beta[j],
+      double log_den = log_post_beta(data.col(j), now_beta[j],
                                         now_alpha, WC_caches[j], now_sigma_beta);
       
       if (log(R::runif(0, 1)) < (log_num - log_den)) {
@@ -248,7 +248,7 @@ List MCMC_action_model_v5(int N_iter,
     }
     
     // =========================================================================
-    // Step 2: Alpha 업데이트 (MH)
+    // Step 2: Update Alpha (MH)
     // =========================================================================
     for (int i = 0; i < n_resp; i++) {
       double candi_alpha = R::rnorm(now_alpha[i], proposal_sd_alpha);
@@ -258,9 +258,9 @@ List MCMC_action_model_v5(int N_iter,
         WC_i_vec[j] = WC_caches[j][i];
       }
       
-      double log_num = log_post_alpha_v5(data.row(i).t(), candi_alpha,
+      double log_num = log_post_alpha(data.row(i).t(), candi_alpha,
                                          now_beta, WC_i_vec, now_sigma_alpha);
-      double log_den = log_post_alpha_v5(data.row(i).t(), now_alpha[i],
+      double log_den = log_post_alpha(data.row(i).t(), now_alpha[i],
                                          now_beta, WC_i_vec, now_sigma_alpha);
       
       if (log(R::runif(0, 1)) < (log_num - log_den)) {
@@ -270,7 +270,7 @@ List MCMC_action_model_v5(int N_iter,
     }
     
     // =========================================================================
-    // Step 3: W 업데이트 (MH) - 3중 loop (j, l, d)
+    // Step 3: Update W (MH) - triple loop over (j, l, d)
     // =========================================================================
     int w_idx = 0;
     for (int j = 0; j < n_prob; j++) {
@@ -278,16 +278,16 @@ List MCMC_action_model_v5(int N_iter,
       
       for (int l = 0; l < N_j; l++) {
         for (int d = 0; d < D; d++) {
-          int flat_idx = l * D + d;  // 펼친 인덱스
+          int flat_idx = l * D + d;  // flattened index
           
           double candi_w = R::rnorm(now_W[j][flat_idx], proposal_sd_w);
           
           vec C_sum_col = C_sum_list[j].col(flat_idx);
           
-          double log_num = log_post_w_v5(data.col(j), candi_w, now_W[j][flat_idx],
+          double log_num = log_post_w(data.col(j), candi_w, now_W[j][flat_idx],
                                          now_alpha, now_beta[j], WC_caches[j],
                                          C_sum_col, now_lambda[j][flat_idx], tau2, nu2);
-          double log_den = log_post_w_v5(data.col(j), now_W[j][flat_idx], now_W[j][flat_idx],
+          double log_den = log_post_w(data.col(j), now_W[j][flat_idx], now_W[j][flat_idx],
                                          now_alpha, now_beta[j], WC_caches[j],
                                          C_sum_col, now_lambda[j][flat_idx], tau2, nu2);
           
@@ -304,7 +304,7 @@ List MCMC_action_model_v5(int N_iter,
     }
     
     // =========================================================================
-    // Step 4: Lambda 업데이트 (Gibbs) - 각 (j, l, d)에 대해 독립적
+    // Step 4: Update Lambda (Gibbs) - independently for each (j, l, d)
     // =========================================================================
     for (int j = 0; j < n_prob; j++) {
       int N_j = (int)N_j_vec[j];
@@ -328,7 +328,7 @@ List MCMC_action_model_v5(int N_iter,
     }
     
     // =========================================================================
-    // Step 5: 분산 파라미터 업데이트 (Gibbs)
+    // Step 5: Update variance parameters (Gibbs)
     // =========================================================================
     
     // sigma_alpha ~ IG(2, 1)
@@ -338,7 +338,7 @@ List MCMC_action_model_v5(int N_iter,
     now_sigma_alpha = 1.0 / R::rgamma(shape_alpha, 1.0 / rate_alpha);
     
     // =========================================================================
-    // 결과 저장 (burn-in 이후, thinning 적용)
+    // Save samples (post burn-in, with thinning)
     // =========================================================================
     if (iter >= burn_in && (iter - burn_in) % thin == 0) {
       result_alpha.row(save_idx) = now_alpha.t();
@@ -362,7 +362,7 @@ List MCMC_action_model_v5(int N_iter,
     }
   }
   
-  // 수락률 계산
+  // Compute acceptance rates
   accept_alpha /= N_iter;
   accept_beta /= N_iter;
   accept_w /= N_iter;
