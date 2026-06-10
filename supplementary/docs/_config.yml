@@ -1,0 +1,20 @@
+title: "Action-IRT"
+description: "A representation-learning item response model for identifying behaviorally important actions in PIAAC process data"
+baseurl: "/action-irt"
+url: "https://P-JuNYeonG.github.io"
+theme: minima
+markdown: kramdown
+
+kramdown:
+  math_engine: mathjax
+
+header_pages:
+  - pages/method.md
+  - pages/results.md
+  - pages/simulation.md
+  - pages/appendix.md
+
+author:
+  name: "Junyeong Park, Daeun Hwangbo, Seyoung Park, Ick Hoon Jin, and Minjeong Jeon"
+
+github_username: P-JuNYeonG
