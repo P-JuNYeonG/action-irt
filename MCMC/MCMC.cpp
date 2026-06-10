@@ -86,10 +86,10 @@ double log_post_beta(const vec& data_j,
 // Log posterior for Alpha_i
 // [[Rcpp::export]]
 double log_post_alpha(const vec& data_i,
-                         double candi_alpha,
-                         const vec& beta,
-                         const vec& WC_i_vec,
-                         double sigma_alpha) {
+                        double candi_alpha,
+                        const vec& beta,
+                        const vec& WC_i_vec,
+                        double sigma_alpha) {
   
   int n_prob = data_i.n_elem;
   double log_likelihood = 0.0;
@@ -109,15 +109,15 @@ double log_post_alpha(const vec& data_i,
 // C_sum_col: the (l*D+d)-th column of C_sum_list[j]
 // [[Rcpp::export]]
 double log_post_w(const vec& data_j,
-                     double candi_w,
-                     double current_w,
-                     const vec& alpha,
-                     double beta_j,
-                     const vec& WC_cache,
-                     const vec& C_sum_col,
-                     double lambda_jld,
-                     double tau2,
-                     double nu2) {
+                    double candi_w,
+                    double current_w,
+                    const vec& alpha,
+                    double beta_j,
+                    const vec& WC_cache,
+                    const vec& C_sum_col,
+                    double lambda_jld,
+                    double tau2,
+                    double nu2) {
   
   int n_resp = data_j.n_elem;
   double log_likelihood = 0.0;
@@ -259,9 +259,9 @@ List MCMC_action_model(int N_iter,
       }
       
       double log_num = log_post_alpha(data.row(i).t(), candi_alpha,
-                                         now_beta, WC_i_vec, now_sigma_alpha);
+                                        now_beta, WC_i_vec, now_sigma_alpha);
       double log_den = log_post_alpha(data.row(i).t(), now_alpha[i],
-                                         now_beta, WC_i_vec, now_sigma_alpha);
+                                        now_beta, WC_i_vec, now_sigma_alpha);
       
       if (log(R::runif(0, 1)) < (log_num - log_den)) {
         now_alpha[i] = candi_alpha;
@@ -285,11 +285,11 @@ List MCMC_action_model(int N_iter,
           vec C_sum_col = C_sum_list[j].col(flat_idx);
           
           double log_num = log_post_w(data.col(j), candi_w, now_W[j][flat_idx],
-                                         now_alpha, now_beta[j], WC_caches[j],
-                                         C_sum_col, now_lambda[j][flat_idx], tau2, nu2);
+                                        now_alpha, now_beta[j], WC_caches[j],
+                                        C_sum_col, now_lambda[j][flat_idx], tau2, nu2);
           double log_den = log_post_w(data.col(j), now_W[j][flat_idx], now_W[j][flat_idx],
-                                         now_alpha, now_beta[j], WC_caches[j],
-                                         C_sum_col, now_lambda[j][flat_idx], tau2, nu2);
+                                        now_alpha, now_beta[j], WC_caches[j],
+                                        C_sum_col, now_lambda[j][flat_idx], tau2, nu2);
           
           if (log(R::runif(0, 1)) < (log_num - log_den)) {
             double delta_w = candi_w - now_W[j][flat_idx];

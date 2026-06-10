@@ -22,12 +22,6 @@ USER_CONFIG <- list(
   PRE        = "robust",
   
 
-  # --- 경로 설정 ---
-  # workspace_root: 프로젝트 최상위 디렉토리 (자동 탐색 또는 수동 지정)
-  # 자동 탐색 로직: 스크립트 위치 기준 ../../ (원본과 동일)
-  # 수동 지정 시 아래 줄의 주석을 해제하고 경로 입력
-  # workspace_root = "/path/to/your/workspace",
-  
   # --- MCMC 설정 ---
   N_iter           = 50000,
   burn_in_ratio    = 0.2,
