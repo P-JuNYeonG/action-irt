@@ -1,71 +1,98 @@
-# Stage 2: Hybrid Word2Vec for Action Embedding
+# Stage 2: Hybrid Word2Vec Action Embedding
 
 ## Purpose
 
-Learn dense vector representations of action units by exploiting sequential context (skip-gram) and internal token structure (FastText-style composition).
+Learn dense vector representations of action units by using both sequential context and the internal token structure of each action unit.
+
+This stage receives cleaned action sequences from Stage 1 and produces respondent-level embedding matrices for Stage 3.
 
 ## Model
 
 ```
-Composite embedding:  e(u) = v_u + Σ v_g_r
+Composite action embedding:
+  e(u) = v_u + sum_r v_g_r
 
 Training pairs:
-  (1) Unit–Unit:   center unit → neighboring units within context window
-  (2) Token–Unit:  each token of center unit → same neighboring units
+  1. Unit-Unit:  center action unit -> neighboring action units
+  2. Token-Unit: tokens of center action unit -> neighboring action units
 
-Objective: Skip-gram with negative sampling
+Objective:
+  Skip-gram with negative sampling
 ```
 
 ## Input
 
-- Cleaned action sequences from Stage 1
+Stage 1 writes one text file per item:
+
+```text
+model_input/HW2V/test_us_{item}.txt
+```
+
+Each line is a respondent-item action sequence.
 
 ## Output
 
-- Action embedding vectors: one vector per unique action unit (dimension: D_Action = 20)
-- Per-respondent embedding matrices: N_ij × D_Action per (respondent, item) pair
+The training script writes item-level embedding artifacts, including:
+
+| Output | Description |
+|--------|-------------|
+| `fasttext_style_word2vec.pkl` | Trained Hybrid Word2Vec model |
+| `vocabulary.txt` | Token and unit vocabulary |
+| `training_log.json` | Training-loss and validation information |
+| `unit_embeddings_fasttext.npz` | Action-unit embedding matrix |
+| `token_embeddings.npz` | Token embedding matrix |
+
+`build_embedding_matrices.py` then creates respondent-level matrices:
+
+```text
+{output_dir}/embed_mat_ps1_{suffix}.pkl
+{output_dir}/embed_mat_ps2_{suffix}.pkl
+```
+
+Each dictionary key is a respondent-item identifier and each value is an `N_ij x (D_Action + 3)` matrix when timestamp features are included.
 
 ## Temporal Augmentation
 
-After embedding, each action vector is augmented with three temporal features:
-- Elapsed time: t
-- Squared elapsed time: t²
-- Inter-action interval: t_n − t_{n−1}
+After action embedding, each action vector can be augmented with:
 
-Temporal features are standardized within each item.
+- elapsed time
+- squared elapsed time
+- inter-action interval
 
-Final output dimension per action: D_Action + 3
+Temporal features are scaled to be comparable with the embedding dimensions unless `--no-scale-to-embedding` is used.
 
 ## Key Hyperparameters
 
-| Parameter | Value |
-|-----------|-------|
-| Embedding dimension (D_Action) | 20 |
+| Parameter | Default |
+|-----------|---------|
+| Embedding dimension | 20 |
 | Context window size | 1 |
 | Negative samples | 5 |
 | Training epochs | 100 |
 | Learning rate | 0.001 |
+| Minimum count | 1 |
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `data_loader.py` | Loads action-sequence text files and creates Unit-Unit and Token-Unit training pairs |
-| `vocab_builder.py` | Builds token/unit vocabularies and negative-sampling distributions |
-| `model.py` | Implements the FastText-style Token-Unit Word2Vec model |
-| `trainer.py` | Implements Adam optimization, negative sampling, validation, and checkpoint saving |
-| `train_word2vec.py` | Command-line training entry point |
+| `HW2V/data_loader.py` | Loads action sequences and creates training pairs |
+| `HW2V/vocab_builder.py` | Builds token/unit vocabularies and negative-sampling distributions |
+| `HW2V/model.py` | Implements the FastText-style Token-Unit Word2Vec model |
+| `HW2V/trainer.py` | Implements optimization, negative sampling, validation, and checkpoint saving |
+| `HW2V/train_word2vec.py` | Command-line training entry point |
 | `build_embedding_matrices.py` | Builds respondent-level embedding matrices and appends timestamp features |
-| `utils.py` | Optional embedding analysis and export helpers |
+| `HW2V/utils.py` | Optional embedding analysis and export helpers |
+| `LSTM_AE/` | Stage 3 dimension-reduction scripts |
 
 ## Usage
 
-Train one item-level embedding model:
+Run the following from `Module/HW2V/` to train one item-level embedding model:
 
 ```bash
 python train_word2vec.py \
   --input_file ../../model_input/HW2V/test_us_ps1_1.txt \
-  --output_dir outputs/HW2V_ps1_1_20 \
+  --output_dir ../outputs/HW2V_ps1_1_20 \
   --embed_dim 20 \
   --window_size 1 \
   --negative_samples 5 \
@@ -73,14 +100,25 @@ python train_word2vec.py \
   --epochs 100
 ```
 
-Build embedding matrices with timestamp features after item-level models have been trained:
+Run the following from `Module/` after item-level models have been trained:
 
 ```bash
 python build_embedding_matrices.py \
-  --data-template ../01_preprocessing/input_data/3rd_data/us_{problem_num}.pkl \
+  --data-template ../Data/Preprocessing/input_data/3rd_data/us_{problem_num}.pkl \
   --model-template outputs/HW2V_{problem_num}_20/fasttext_style_word2vec.pkl \
-  --sequence-template ../../model_input/HW2V/test_us_{problem_num}.txt \
-  --output-dir ../../model_output
+  --sequence-template ../model_input/HW2V/test_us_{problem_num}.txt \
+  --output-dir outputs
 ```
 
-Large trained model files and generated embedding matrices are not redistributed in this repository.
+To build matrices for selected items only:
+
+```bash
+python build_embedding_matrices.py \
+  --items ps1_1 ps1_2 \
+  --data-template ../Data/Preprocessing/input_data/3rd_data/us_{problem_num}.pkl \
+  --model-template outputs/HW2V_{problem_num}_20/fasttext_style_word2vec.pkl \
+  --sequence-template ../model_input/HW2V/test_us_{problem_num}.txt \
+  --output-dir outputs
+```
+
+Large trained models and generated embedding matrices are not redistributed.

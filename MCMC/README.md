@@ -2,79 +2,95 @@
 
 ## Purpose
 
-Estimate respondent ability, item difficulty, and action weights jointly via MCMC, with automatic variable selection over the action space using a spike-and-slab prior.
+Estimate respondent ability, item difficulty, and action effects jointly with MCMC. The model uses a spike-and-slab prior to select action effects associated with response accuracy.
 
 ## Model
 
-```
-logit(π_ij) = α_i + β_j + Σ_l Σ_d ω^(d)_jl · C̄^(d)_ijl · I(l ∈ A_ij)
+```text
+logit(pi_ij) = alpha_i + beta_j + sum_l sum_d omega_jl^(d) * Cbar_ijl^(d) * I(l in A_ij)
 ```
 
-### Priors
+where:
+
+- `alpha_i` is respondent ability.
+- `beta_j` is item difficulty.
+- `Cbar_ijl^(d)` is the aggregated latent action value from Stage 3.
+- `omega_jl^(d)` is the action weight.
+- `lambda_jl^(d)` is the spike-and-slab inclusion indicator.
+
+## Priors
 
 | Parameter | Prior |
 |-----------|-------|
-| α_i | N(0, σ²_α) |
-| β_j | N(0, 1) — fixed |
-| ω^(d)_jl \| λ=0 | N(0, τ²) — spike |
-| ω^(d)_jl \| λ=1 | N(0, ν²) — slab |
-| λ^(d)_jl | Bernoulli(0.5) |
-| σ²_α | Inverse-Gamma(2, 1) |
+| `alpha_i` | Normal prior with variance `sigma_alpha^2` |
+| `beta_j` | Normal prior with fixed variance |
+| `omega_jl^(d)`, when `lambda = 0` | Spike normal prior with variance `tau^2` |
+| `omega_jl^(d)`, when `lambda = 1` | Slab normal prior with variance `nu^2` |
+| `lambda_jl^(d)` | Bernoulli prior |
+| `sigma_alpha^2` | Inverse-Gamma prior |
 
-### MCMC Updates
+## MCMC Updates
 
 | Parameter | Method |
 |-----------|--------|
-| α_i | Metropolis–Hastings (Gaussian random walk) |
-| β_j | Metropolis–Hastings (Gaussian random walk) |
-| ω^(d)_jl | Metropolis–Hastings (Gaussian random walk) |
-| λ^(d)_jl | Gibbs (closed-form Bernoulli) |
-| σ²_α | Gibbs (conjugate Inverse-Gamma) |
+| `alpha_i` | Metropolis-Hastings random walk |
+| `beta_j` | Metropolis-Hastings random walk |
+| `omega_jl^(d)` | Metropolis-Hastings random walk |
+| `lambda_jl^(d)` | Gibbs update |
+| `sigma_alpha^2` | Conjugate Gibbs update |
 
 ## Input
 
-- Response matrix: n_resp × n_prob (binary)
-- C_sum_list: per-item matrices of aggregated latent values (from Stage 3)
-- N_j_vec: number of unique actions per item
+The empirical MCMC script expects locally generated model inputs from previous stages, including:
+
+- binary response data
+- aggregated latent action values from Stage 3
+- per-item action-count information
+
+The exact local paths are configured inside `run_mcmc.R`; update them to match your local data layout before running.
 
 ## Output
 
-- Posterior samples: α, β, W (action weights), λ (inclusion indicators), σ
-- Acceptance rates for MH steps
-- Stored as .RData
+Typical outputs include:
+
+- posterior samples for `alpha`, `beta`, `W`, `lambda`, and `sigma`
+- Metropolis-Hastings acceptance rates
+- posterior inclusion probabilities (PIPs)
+- saved `.RData` result objects
 
 ## Files
 
 | File | Description |
 |------|-------------|
 | `MCMC.cpp` | C++/Rcpp implementation of the MCMC sampler |
-| `run_mcmc.R` | R driver script: data loading, scaling, MCMC call, diagnostics |
+| `run_mcmc.R` | R driver for data loading, scaling, sampler compilation, MCMC execution, and result saving |
 
-## MCMC Settings
+## Empirical Settings
 
 | Setting | Value |
 |---------|-------|
 | Iterations | 50,000 |
-| Burn-in | 10,000 (20%) |
+| Burn-in | 10,000 |
 | Thinning | 10 |
 | Saved samples | 4,000 |
-| proposal_sd_alpha | 1.5 |
-| proposal_sd_beta | 0.5 |
-| proposal_sd_w | 0.4 |
-| τ² (spike) | 0.001 |
-| ν² (slab) | 2.5 |
+| `proposal_sd_alpha` | 1.5 |
+| `proposal_sd_beta` | 0.5 |
+| `proposal_sd_w` | 0.4 |
+| Spike variance `tau^2` | 0.001 |
+| Slab variance `nu^2` | 2.5 |
 
 ## Usage
 
-```r
-# In R:
-source("run_mcmc.R")
+Run from `MCMC/`:
 
-# Or from command line:
-Rscript run_mcmc.R --model lstm_ae --dim 1 --pre robust --iter 50000
+```bash
+Rscript run_mcmc.R
 ```
+
+The current script is configured primarily through variables and paths inside `run_mcmc.R`. If you need to change model type, latent dimension, preprocessing variant, iteration count, or output paths, edit the configuration section of that script before running.
 
 ## Computational Notes
 
-- The sampler uses an incremental WC_cache strategy to avoid recomputing the full linear predictor at each W update.
-- Typical runtime: ~45–90 minutes for 50,000 iterations on a single core (depends on action vocabulary size).
+- `run_mcmc.R` compiles `MCMC.cpp` via Rcpp before running the sampler.
+- The sampler uses an incremental cache strategy for the action-effect term to reduce repeated linear-predictor computation.
+- Runtime depends on the number of respondents, items, actions, latent dimensions, and MCMC iterations.

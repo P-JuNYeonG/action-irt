@@ -10,25 +10,33 @@
 
 ## Overview
 
-This repository contains the code and supplementary materials for an end-to-end framework that identifies behaviorally important actions in problem-solving process data from large-scale computer-based assessments.
+This repository contains code and supplementary materials for an end-to-end Action-IRT workflow. The workflow converts raw problem-solving process logs into action sequences, learns action-level representations, reduces those representations to low-dimensional latent values, and estimates an Item Response Theory model with action effects and spike-and-slab variable selection.
 
-The framework transforms raw log sequences into interpretable action-level effect estimates within a psychometric Item Response Theory (IRT) model. It consists of three stages:
+The empirical application uses PIAAC Problem Solving in Technology-Rich Environments (PSTRE) log data. Raw OECD data and generated intermediate files are not redistributed in this repository.
 
 ```
-┌─────────────────┐     ┌─────────────────────┐     ┌──────────────────────────┐
-│  1. Action       │     │  2. Dimension        │     │  3. Action-IRT with      │
-│     Embedding    │────▶│     Reduction         │────▶│     Spike-and-Slab       │
-│  (Hybrid W2V)   │     │  (LSTM AutoEncoder)  │     │     Variable Selection   │
-└─────────────────┘     └─────────────────────┘     └──────────────────────────┘
- Raw log sequences       Variable-length             Binary responses +
- → Dense action           embedding sequences         latent action values
-   vectors                → D-dimensional             → Important action
-                            latent values                identification
+Raw PIAAC logs
+    |
+    v
+Data/Preprocessing
+    Rule-based and LLM-assisted action-sequence construction
+    |
+    v
+Module/HW2V
+    Hybrid Word2Vec action embedding
+    |
+    v
+Module/LSTM_AE
+    LSTM AutoEncoder dimension reduction
+    |
+    v
+MCMC
+    Action-IRT estimation with spike-and-slab selection
+    |
+    v
+Simulation
+    Parametric-bootstrap recovery evaluation
 ```
-
-**Applied to:** 14 PSTRE items from the OECD PIAAC (U.S. sample, 1,996 respondents).
-
-**Key result:** 126 out of 2,025 action–item combinations (6.2%) were identified as important, with a parametric-bootstrap simulation confirming action-level AUC of 0.94 and PIP-based sensitivity of 0.93.
 
 ---
 
@@ -37,110 +45,153 @@ The framework transforms raw log sequences into interpretable action-level effec
 ```
 action-irt/
 ├── README.md
-├── LICENSE                          # MIT License
-├── .gitignore
-├── setup_r_env.R                    # R package dependency setup
+├── LICENSE
+├── config.yaml                 # Central configuration values used by analysis scripts
+├── setup_r_env.R               # R package setup helper
 │
-├── manuscript/                      # LaTeX source for the paper
-│   ├── main.tex
-│   ├── reference.bib
-│   ├── figures/
-│   └── tables/
+├── Data/
+│   ├── README.md
+│   └── Preprocessing/
+│       ├── README.md
+│       ├── 01_preprocessing_notebook.ipynb
+│       ├── 01_preprocess_rules.py
+│       ├── 02_llm_clean_descriptions.py
+│       ├── openrouter_client.py
+│       ├── prompts.py
+│       └── mapping_tables/
 │
-├── code/
-│   ├── 01_preprocessing/            # Data cleaning (rule-based + LLM-assisted)
-│   │   └── README.md
-│   ├── 02_embedding/                # Hybrid Word2Vec for action embedding
-│   │   └── README.md
-│   ├── 03_dimension_reduction/      # LSTM AutoEncoder
-│   │   └── README.md
-│   ├── 04_mcmc/                     # Action-IRT model (C++/Rcpp + R)
-│   │   ├── README.md
-│   │   ├── MCMC.cpp
-│   │   └── run_mcmc.R
-│   └── 05_simulation/              # Parametric bootstrap simulation
-│       └── README.md
+├── Module/
+│   ├── README.md
+│   ├── build_embedding_matrices.py
+│   ├── HW2V/
+│   │   ├── train_word2vec.py
+│   │   ├── data_loader.py
+│   │   ├── model.py
+│   │   ├── trainer.py
+│   │   ├── utils.py
+│   │   └── vocab_builder.py
+│   └── LSTM_AE/
+│       ├── README.md
+│       ├── train_lstm_ae.py
+│       └── export_latent_long.py
 │
-├── analysis/                        # Post-estimation analysis and visualization
-│   ├── convergence_diagnostics.R
-│   ├── important_actions.R
-│   └── figures/
+├── MCMC/
+│   ├── README.md
+│   ├── MCMC.cpp
+│   └── run_mcmc.R
 │
-├── supplementary/                   # Appendix materials
-│   ├── llm_prompts/                 # LLM preprocessing prompts
-│   └── full_item_tables/            # Complete action tables for all 14 items
+├── Simulation/
+│   ├── README.md
+│   └── multi_seed_simulation.R
 │
-└── docs/                            # GitHub Pages website
-    └── index.md
+├── Figures/
+│   └── Selected figures for the manuscript and supplementary materials
+│
+└── Supplementary/
+    ├── manuscript/
+    ├── docs/
+    ├── full_item_tables/
+    └── llm_prompts/
 ```
 
 ---
 
 ## Data Availability
 
-The analysis uses log process data from the **OECD Programme for the International Assessment of Adult Competencies (PIAAC)**, Problem Solving in Technology-Rich Environments (PSTRE) domain.
+The analysis uses log process data from the OECD Programme for the International Assessment of Adult Competencies (PIAAC), specifically the PSTRE domain.
 
-- **Access:** PIAAC public-use data files are available from the [OECD PIAAC Data Portal](https://www.oecd.org/skills/piaac/data/).
-- **Restriction:** Raw log files are not redistributed in this repository due to OECD data use terms.
-- **Reproducibility:** All analysis code is provided. Users who obtain the PIAAC log data can reproduce the full pipeline by following the instructions below.
+- PIAAC public-use files are available from the [OECD PIAAC Data Portal](https://www.oecd.org/skills/piaac/data/).
+- Raw log files are not included here because redistribution is governed by OECD data-use terms.
+- Scripts assume that users place locally obtained raw and processed data in the expected local input paths before running the full pipeline.
 
 ---
 
-## Reproduction Guide
+## Software Requirements
 
-### Prerequisites
+| Software | Purpose |
+|----------|---------|
+| R >= 4.3 | MCMC estimation, simulation, diagnostics |
+| Python >= 3.9 | Preprocessing utilities, Hybrid Word2Vec, LSTM AutoEncoder |
+| C++17-compatible compiler | Rcpp/RcppArmadillo compilation for the MCMC sampler |
 
-| Software | Version | Purpose |
-|----------|---------|---------|
-| R        | ≥ 4.3   | MCMC estimation, diagnostics, visualization |
-| Python   | ≥ 3.9   | Action embedding (Word2Vec), LSTM AutoEncoder |
-| C++ compiler | C++17 compatible | Rcpp/RcppArmadillo for MCMC sampler |
-
-### Step-by-step
+Install R dependencies from the repository root:
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/P-JuNYeonG/action-irt.git
-cd action-irt
-
-# 2. Install R dependencies
 Rscript setup_r_env.R
-
-# 3. Install Python dependencies
-pip install -r requirements.txt  # if provided
-
-# 4. Run the pipeline in order
-#    Step 1: Preprocessing (see code/01_preprocessing/README.md)
-#    Step 2: Action embedding (see code/02_embedding/README.md)
-#    Step 3: Dimension reduction (see code/03_dimension_reduction/README.md)
-#    Step 4: MCMC estimation (see code/04_mcmc/README.md)
-#    Step 5: Simulation study (see code/05_simulation/README.md)
 ```
 
-### MCMC Settings (Empirical Analysis)
-
-| Parameter | Value |
-|-----------|-------|
-| Total iterations | 50,000 |
-| Burn-in | 10,000 |
-| Thinning | 10 |
-| Saved samples | 4,000 |
-| Spike variance τ² | 0.001 |
-| Slab variance ν² | 2.5 |
-| Latent dimension D | 1 |
+Python dependencies depend on the local environment used for embedding and LSTM-AE training. The main Python scripts use common scientific packages such as `numpy`, `pandas`, `torch`, `matplotlib`, and `scikit-learn`.
 
 ---
 
-## Key Results Summary
+## Pipeline Guide
 
-| Metric | Value |
-|--------|-------|
+Run each stage from the directory that contains the relevant script unless you adapt the paths.
+
+1. **Data preprocessing**
+
+   See `Data/Preprocessing/README.md`.
+
+   Main outputs:
+   - `model_input/HW2V/test_us_{item}.txt`
+   - `model_input/IRT/test_us_{item}.csv`
+   - third-pass item pickle files
+
+2. **Action embedding**
+
+   See `Module/README.md`.
+
+   Main scripts:
+   - `Module/HW2V/train_word2vec.py`
+   - `Module/build_embedding_matrices.py`
+
+3. **Dimension reduction**
+
+   See `Module/LSTM_AE/README.md`.
+
+   Main scripts:
+   - `Module/LSTM_AE/train_lstm_ae.py`
+   - `Module/LSTM_AE/export_latent_long.py`
+
+4. **Action-IRT estimation**
+
+   See `MCMC/README.md`.
+
+   Main scripts:
+   - `MCMC/MCMC.cpp`
+   - `MCMC/run_mcmc.R`
+
+5. **Parametric-bootstrap simulation**
+
+   See `Simulation/README.md`.
+
+   Main script:
+   - `Simulation/multi_seed_simulation.R`
+
+---
+
+## Empirical Settings
+
+| Setting | Value |
+|---------|-------|
 | Respondents | 1,996 |
-| Items | 14 |
-| Total action–item combinations | 2,025 |
-| Important actions identified | 126 (6.2%) |
-| Simulation AUC (mean ± SD) | 0.943 ± 0.011 |
-| Simulation sensitivity (mean ± SD) | 0.935 ± 0.013 |
+| PSTRE items | 14 |
+| Action-item combinations | 2,025 |
+| Primary latent dimension | D = 1 |
+| MCMC iterations | 50,000 |
+| Burn-in | 10,000 |
+| Thinning | 10 |
+| Saved posterior samples | 4,000 |
+| Spike variance | 0.001 |
+| Slab variance | 2.5 |
+
+---
+
+## Reported Results
+
+The empirical analysis identified 126 important action-item combinations out of 2,025 candidates. The parametric-bootstrap simulation reported an action-level AUC of approximately 0.94 and PIP-threshold sensitivity of approximately 0.93.
+
+See the manuscript and supplementary materials for the full interpretation, item-level tables, and simulation details.
 
 ---
 
@@ -150,7 +201,7 @@ If you use this code or framework, please cite:
 
 ```bibtex
 @article{park2026actionirt,
-  title={Item Response Model for Online Educational Assessment Dataset 
+  title={Item Response Model for Online Educational Assessment Dataset
          with Log Sequence Dataset},
   author={Park, Junyeong and Park, Seyoung and Jin, Ick Hoon and Jeon, Minjeong},
   journal={Psychometrika},
@@ -163,10 +214,4 @@ If you use this code or framework, please cite:
 
 ## License
 
-Code is released under the [MIT License](LICENSE). The manuscript text is © the authors.
-
----
-
-## Contact
-
-For questions about the code or analysis, please open an issue or contact: [corresponding author email]
+Code is released under the [MIT License](LICENSE). Manuscript and supplementary text remain copyright of the authors.

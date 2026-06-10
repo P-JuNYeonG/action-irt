@@ -1,68 +1,79 @@
-# Stage 3: LSTM AutoEncoder for Dimension Reduction
+# Stage 3: LSTM AutoEncoder Dimension Reduction
 
 ## Purpose
 
-Compress the augmented action embedding sequence (N_ij × (D_Action + 3)) into a low-dimensional latent representation (N_ij × D) that preserves sequential context.
+Compress augmented action embedding sequences into low-dimensional latent action values for the Action-IRT model.
+
+The input to this stage is a variable-length sequence matrix for each respondent-item pair. The output is a latent sequence matrix with the same action order and a smaller feature dimension.
 
 ## Architecture
 
+```text
+Input sequence: N_ij x (D_Action + 3)
+    |
+    v
+LSTM encoder
+    |
+    v
+Linear bottleneck projection
+    |
+    v
+Latent sequence: N_ij x D
+    |
+    v
+Linear expansion + LSTM decoder
+    |
+    v
+Reconstructed input sequence
 ```
-Input: augmented embedding sequence (N_ij × 23)
-    │
-    ▼
-┌──────────────────┐
-│  LSTM Encoder     │  → hidden state h_n at each position
-│  (H_enc units)    │
-└──────────────────┘
-    │
-    ▼  Linear projection: W_proj · h_n + b_proj
-┌──────────────────┐
-│  Latent space     │  → C_n ∈ R^D  (bottleneck)
-│  (D dimensions)   │
-└──────────────────┘
-    │
-    ▼  Linear expansion + LSTM Decoder
-┌──────────────────┐
-│  LSTM Decoder     │  → reconstructed embedding ê_n
-│  (H_dec units)    │
-└──────────────────┘
-    │
-    ▼
-Output: reconstructed sequence (N_ij × 23)
 
-Loss: MSE over non-padded positions
-```
+The loss is mean squared error over non-padded sequence positions.
 
 ## Input
 
-- Augmented embedding matrices from Stage 2: N_ij × (D_Action + 3) per (respondent, item)
-- Stored as a pickle dictionary: `{(seq_id, problem_num): numpy.ndarray}`
+`train_lstm_ae.py` expects a pickle dictionary:
+
+```python
+{(seq_id, problem_num): numpy.ndarray}
+```
+
+where each array is an `N_ij x (D_Action + 3)` embedding matrix produced by Stage 2.
 
 ## Output
 
-- Reduced latent matrices: N_ij × D per (respondent, item)
-- Saved model weights and reconstruction-loss curves
-- Optional long-format CSV for Action-IRT:
-  `seq_id, problem_num, behavior_id, action_name, outcome, N_ij, C_value1, ..., C_valueD`
+Typical outputs include:
+
+| Output | Description |
+|--------|-------------|
+| `lstm_ae_reduced_D{D}.pkl` | Reduced latent matrices for a latent dimension |
+| model checkpoint files | Optional saved model weights |
+| loss-curve figures | Optional training/validation loss plots |
+| long-format CSV | Optional Action-IRT input exported by `export_latent_long.py` |
+
+The long-format CSV includes columns such as:
+
+```text
+seq_id, problem_num, behavior_id, action_name, outcome, N_ij, C_value1, ...
+```
 
 ## Key Hyperparameters
 
-| Parameter | Value |
-|-----------|-------|
-| Encoder hidden dim (H_enc) | 64 |
-| Latent dimension (D) | 1 (primary), 2–5 (sensitivity) |
-| Decoder hidden dim (H_dec) | 64 |
+| Parameter | Default |
+|-----------|---------|
+| Encoder/decoder hidden dimension | 64 |
+| Latent dimensions | 1,2,3,4,5 |
 | Learning rate | 0.001 |
 | Batch size | 64 |
 | Epochs | 200 |
-| Early stopping patience | 20 |
+| Early-stopping patience | 20 |
+| Validation ratio | 0.1 |
 
 ## Scaling
 
-The training script exports raw LSTM-AE latent values. The export script robust-scales latent values within each item before writing the Action-IRT CSV unless `--no-robust-scale` is used:
+`train_lstm_ae.py` exports raw latent values. `export_latent_long.py` robust-scales latent values within each item before writing the Action-IRT CSV unless `--no-robust-scale` is used:
 
-```
-C_scaled = (C − median(C)) / IQR(C)
+```text
+C_scaled = (C - median(C)) / IQR(C)
 ```
 
 ## Files
@@ -74,11 +85,13 @@ C_scaled = (C − median(C)) / IQR(C)
 
 ## Usage
 
-Train LSTM autoencoders for a problem group:
+Run commands from `Module/LSTM_AE/`.
+
+Train LSTM autoencoders for all `ps1` items and multiple latent dimensions:
 
 ```bash
 python train_lstm_ae.py \
-  --input-pkl ../02_embedding/outputs/embed_mat_ps1_20.pkl \
+  --input-pkl ../outputs/embed_mat_ps1_20.pkl \
   --output-dir outputs/lstm_ae_ps1 \
   --item-group ps1 \
   --latent-dims 1,2,3,4,5 \
@@ -92,13 +105,13 @@ Train one item and one latent dimension:
 
 ```bash
 python train_lstm_ae.py \
-  --input-pkl ../02_embedding/outputs/embed_mat_ps1_20.pkl \
+  --input-pkl ../outputs/embed_mat_ps1_20.pkl \
   --output-dir outputs/lstm_ae_ps1_1_D1 \
   --items ps1_1 \
   --latent-dims 1
 ```
 
-Export a reduced latent pickle to the long-format CSV used by Action-IRT:
+Export reduced latent values to the long-format CSV used by Action-IRT:
 
 ```bash
 python export_latent_long.py \
@@ -109,4 +122,6 @@ python export_latent_long.py \
   --unique-action-dir ../../data/unique_actions
 ```
 
-Large trained model files, reduced latent pickle files, loss-curve images, and generated CSV outputs are not redistributed in this repository.
+Adjust the data paths to match the local location of response files, sequence files, and action-name mappings.
+
+Large trained model files, reduced latent pickle files, loss-curve images, and generated CSV outputs are not redistributed.
