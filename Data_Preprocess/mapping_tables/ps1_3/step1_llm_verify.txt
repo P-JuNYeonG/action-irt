@@ -1,0 +1,6 @@
+| event_type | description | substitute | fixed |
+|---|---|---|---|
+| toolbar | id=spread-search-previous-btn | spread-search_previous-btn | spread-search-previous-btn |
+| toolbar | id=spread-search-next-btn | spread-search_next-btn | spread-search-next-btn |
+| button | id=sortcancel | sort_cancel | sortcancel |
+| button | id=sortvalidation | sort_validation | sortvalidation |

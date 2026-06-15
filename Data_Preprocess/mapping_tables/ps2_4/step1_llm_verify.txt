@@ -1,0 +1,12 @@
+| event_type | description | substitute | fixed |
+|---|---|---|---|
+| menu | id=wb-help-menu | wb_help-menu | wb_help-menu |
+| menu | id=wb-edit-menu | wb_edit-menu | wb_edit-menu |
+| menu | id=wb-bookmarks-menu | wb_bookmarks-menu | wb_bookmarks-menu |
+| button | id=manage_bookmark_window_cancel | manage_bookmark-window_cancel | manage-bookmark-window_cancel |
+| textbox_onfocus | id=add_bookmark_bookmark_title_input | add_bookmark_title-input | add_bookmark-title_input |
+| textbox_onfocus | id=add_bookmark_bookmark_url_input | add_bookmark_url-input | add_bookmark-url_input |
+| textbox_onfocus | id=createfoldernameinput | create-folder_nameinput | createfolder_nameinput |
+| textbox_killfocus | id=add_bookmark_bookmark_title_input | add_bookmark_title-input | add_bookmark-title_input |
+| textbox_killfocus | id=add_bookmark_bookmark_url_input | add_bookmark_url-input | add_bookmark-url_input |
+| textbox_killfocus | id=createfoldernameinput | create-folder_nameinput | createfolder_nameinput |

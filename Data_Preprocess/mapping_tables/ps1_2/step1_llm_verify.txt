@@ -1,0 +1,25 @@
+```markdown
+| event_type | description | substitute | fixed |
+|---|---|---|---|
+| toolbar | id=splithorizontal | split_horizontal | splithorizontal |
+| toolbar | id=splitvertical | split_vertical | splitvertical |
+| button | id=addcancel | add_cancel | addcancel |
+| button | id=sortcancel | sort_cancel | sortcancel |
+| button | id=removecancel | remove_cancel | removecancel |
+| button | id=movecancel | move_cancel | movecancel |
+| button | id=addvalidation | add_validation | addvalidation |
+| button | id=movevalidation | move_validation | movevalidation |
+| button | id=copyvalidation | copy_validation | copyvalidation |
+| button | id=sortvalidation | sort_validation | sortvalidation |
+| button | id=removevalidation | remove_validation | removevalidation |
+| textbox_onfocus | id=createfolderwarningtext | create-folder_warningtext | createfolder_warningtext |
+| textbox_onfocus | id=create_folder_name | create-folder_name | create_folder-name |
+| textbox_onfocus | id=createfolderwarningtext2 | create-folder_warningtext2 | createfolder_warningtext2 |
+| textbox_onfocus | id=createfoldernameinput | create-folder_nameinput | createfolder_nameinput |
+| textbox_onfocus | id=createfolderintrotext | create-folder_introtext | createfolder_introtext |
+| textbox_killfocus | id=createfolderwarningtext | create-folder_warningtext | createfolder_warningtext |
+| textbox_killfocus | id=create_folder_name | create-folder_name | create_folder-name |
+| textbox_killfocus | id=createfolderwarningtext2 | create-folder_warningtext2 | createfolder_warningtext2 |
+| textbox_killfocus | id=createfoldernameinput | create-folder_nameinput | createfolder_nameinput |
+| textbox_killfocus | id=createfolderintrotext | create-folder_introtext | createfolder_introtext |
+```

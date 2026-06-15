@@ -1,0 +1,5 @@
+| event_type | description | substitute | fixed |
+|---|---|---|---|
+| menu | id=wb-bookmarks-menu | wb_bookmarks-menu | wb-bookmarks-menu |
+| menu | id=wb-help-menu | wb_help-menu | wb-help-menu |
+| menu | id=wb-edit-menu | wb_edit-menu | wb-edit-menu |

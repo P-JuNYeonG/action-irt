@@ -1,0 +1,6 @@
+| event_type | description | substitute | fixed |
+|---|---|---|---|
+| textbox_onfocus | id=add_bookmark_bookmark_title_input | add-bookmark_title-input | add-bookmark_title_input |
+| textbox_onfocus | id=add_bookmark_bookmark_url_input | add-bookmark_url-input | add-bookmark_url_input |
+| textbox_killfocus | id=add_bookmark_bookmark_title_input | add-bookmark_title-input | add-bookmark_title_input |
+| textbox_killfocus | id=add_bookmark_bookmark_url_input | add-bookmark_url-input | add-bookmark_url_input |
