@@ -8,9 +8,7 @@
 
 This repository contains code and supplementary materials for a three-stage framework that identifies behaviorally important actions in problem-solving process data. Raw log sequences are embedded via a hybrid Word2Vec model, compressed to low-dimensional latent values via an LSTM AutoEncoder, and entered into an extended Rasch model with a spike-and-slab prior for automatic variable selection.
 
-Applied to 14 PSTRE items from the U.S. PIAAC sample (1,996 respondents), the framework identified 126 of 2,025 action–item combinations (6.2%) as important. A parametric-bootstrap simulation yielded action-level AUC of 0.943 and PIP-threshold sensitivity of 0.935.
-
-Project documentation is available on the [Action-IRT companion site](https://p-junyeong.github.io/action-irt/).
+Applied to 14 PSTRE items from the U.S. PIAAC sample (1,996 respondents), the framework identified 126 of 2,025 action–item combinations (6.2%) as important. A parametric-bootstrap simulation yielded action-level AUC of 0.935.
 
 ---
 
