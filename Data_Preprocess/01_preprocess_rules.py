@@ -1,9 +1,7 @@
 """Reusable preprocessing utilities for PIAAC PSTRE action logs.
 
-This script is a cleaned, repository-facing extraction of the legacy
-notebook `01_preprocessing_notebook.ipynb`. The notebook preserves the
-original item-by-item workflow; this module provides reusable functions for
-the common preprocessing operations.
+This script is a cleaned, repository-facing extraction of the legacy notebook `01_preprocessing_notebook.ipynb`.
+The notebook preserves the original item-by-item workflow; this module provides reusable functions for the common preprocessing operations.
 """
 
 from __future__ import annotations

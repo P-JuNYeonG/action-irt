@@ -1,7 +1,5 @@
 # =============================================================================
 # Convergence diagnostics: Gelman-Rubin (R-hat) and PIP stability
-# Model: MCMC_action_model_v5 (fixed beta prior, multi-dimensional D)
-# Burn-in and thinning are applied inside the C++ sampler.
 # =============================================================================
 
 library(Rcpp)
@@ -16,7 +14,7 @@ iteration  <- 50000
 burn_in    <- iteration * 0.2
 thin       <- 10
 
-cpp_path  <- "00_MCMC_edit.cpp"
+cpp_path  <- "MCMC.cpp"
 base_path <- file.path("data", model_name)  # directory with long_format_*.csv
 
 sourceCpp(cpp_path)
@@ -115,7 +113,7 @@ run_multiple_chains <- function(n_chains, n_iter, data, C_sum_list,
     cat(sprintf("Running chain %d / %d...\n", chain_id, n_chains))
     set.seed(1000 * chain_id)
 
-    chains[[chain_id]] <- MCMC_action_model_v5(
+    chains[[chain_id]] <- MCMC_action_model(
       N_iter            = n_iter,
       data              = data,
       C_sum_list        = C_sum_list,

@@ -1,8 +1,7 @@
 """
 Extract embedding matrices keyed by (SEQID, problem_num) for multiple item IDs.
 Version including timestamp features.
-Computes per-item time statistics separately, then rescales time features
-to the embedding scale before combining.
+Computes per-item time statistics separately, then rescales time features to the embedding scale before combining.
 """
 
 import argparse

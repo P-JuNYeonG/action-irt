@@ -1,5 +1,5 @@
-# Multi-seed parametric bootstrap simulation (AUC only)
-# Block A: load data and construct true parameters (once)
+# Multi-seed parametric bootstrap simulation
+# Block A: load data and construct true parameters
 # Block B: per-seed response generation -> MCMC -> AUC
 # Block C: aggregation across seeds
 
@@ -36,7 +36,7 @@ USER_CONFIG <- list(
 
   # To reproduce a previous run exactly, supply its seed list here
   # (see seed_log.txt of that run). Overrides n_seeds and master_seed.
-  # e.g., sim_seeds_override = c(3935997, 6077361, 9769836, 5256305, 7253934),
+  # e.g., sim_seeds_override = c(11111, 22222, 33333, 44444, 55555),
   sim_seeds_override = NULL,
 
   # Number of unique actions per item (fixed, independent of D)
@@ -65,9 +65,9 @@ if (is.null(USER_CONFIG$workspace_root)) {
   script_dir <- getwd()
 }
 
-mcmc_cpp_path <- file.path(script_dir, "00_MCMC_edit.cpp")
+mcmc_cpp_path <- file.path(script_dir, "MCMC.cpp")
 if (!file.exists(mcmc_cpp_path)) {
-  mcmc_cpp_path <- "00_MCMC_edit.cpp"
+  mcmc_cpp_path <- "MCMC.cpp"
 }
 stopifnot(file.exists(mcmc_cpp_path))
 sourceCpp(mcmc_cpp_path)
@@ -85,15 +85,15 @@ config <- list(
   N_j_vec       = USER_CONFIG$N_j_vec,
 
   lstm_data_dir = file.path(workspace_root,
-                            sprintf("Python_file/97_Result/%s", USER_CONFIG$model_name)),
+                            sprintf("path/to/your/data/%s", USER_CONFIG$model_name)),
   all_actions_path = file.path(workspace_root,
-                               sprintf("Python_file/97_Result/%s_D%d_all_actions.csv",
+                               sprintf("path/to/your/data/%s_D%d_all_actions.csv",
                                        USER_CONFIG$model_name, D)),
   significant_actions_path = file.path(workspace_root,
-                                       sprintf("Python_file/97_Result/%s_D%d_significant_actions.csv",
+                                       sprintf("path/to/your/data/%s_D%d_significant_actions.csv",
                                                USER_CONFIG$model_name, D)),
   actual_result_path = file.path(workspace_root,
-                                 sprintf("R_file/05_final_result/%s_%d_%s.RData",
+                                 sprintf("path/to/your/data/%s_%d_%s.RData",
                                          USER_CONFIG$model_name, D, USER_CONFIG$PRE)),
 
   N_pool = NA_integer_,
@@ -380,7 +380,7 @@ run_single_seed <- function(seed, fixed) {
   cat(sprintf("  Responses generated: correct rate = %.1f%%\n", sim_rate * 100))
 
   # B2. Run MCMC
-  mcmc_result <- MCMC_action_model_v5(
+  mcmc_result <- MCMC_action_model(
     N_iter     = cfg$N_iter,
     data       = data_mat,
     C_sum_list = fixed$C_sum_list,

@@ -13,11 +13,10 @@ using namespace std;
 // logit(pi_ij) = alpha_i + beta_j + sum_{l=1}^{N_j} sum_{d=1}^{D} w^(d)_jl * C_bar^(d)_ijl * I(l in A_ij)
 //
 // alpha_i ~ N(0, sigma_alpha)                 : respondent ability
-// beta_j  ~ N(0, 1)                           : item difficulty (fixed prior, variance = 1)
+// beta_j  ~ N(0, 1)                           : item difficulty
 // w^(d)_jl | lambda^(d)_jl ~ spike-and-slab   : action weight (independent across dimensions)
 // lambda^(d)_jl ~ Bernoulli(0.5)
 // sigma_alpha ~ Inverse-Gamma(2, 1)
-//
 //
 // =============================================================================
 // Data Structure (flattening strategy: action-major ordering)
