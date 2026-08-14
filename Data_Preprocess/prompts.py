@@ -59,10 +59,10 @@ When comparing multiple Descriptions within the same group:
 ### Priority 1: Special Character Processing
     - '|' (pipe): Convert to '_' by default to connect
     - Extract detailed information from Description
-    - If detailed variable is a single number, connect 'SI' + 'DI'
+    - If detailed variable is a single number, connect 'SV' + 'DI'
     
     id=pg10|action=open -> id=pg10_open (connect only detailed information 'open')
-    id=inclue_btn30|index=4 -> id=include_btn30_index4 (connect system variable 'index' with single number 4)
+    id=include_btn30|index=4 -> id=include_btn30_index4 (connect system variable 'index' with single number 4)
 
 
 ### Priority 2: Classify Description into common keywords and different keywords.
@@ -194,11 +194,11 @@ When comparing multiple Descriptions within the same group:
         - common keyword (located in the middle, rule A) : pu6
         - different keywords : pg4, pg7, okbtn, cancelbtn
         
-        ** A.Output:**
+        ** C.Output:**
         u07-pg4_pu6_okbtn
         u07-pg7_pu6_cancelbtn
         
-        ** B.Output:**
+        ** A.Output:**
         u07-pg4_pu6-okbtn
         u07-pg7_pu6-cancelbtn
         
@@ -212,11 +212,11 @@ When comparing multiple Descriptions within the same group:
         - common keyword (located at the end, rule B) : btn 
         - different keywords : bkm, help
         
-        ** A.Output:**
+        ** C.Output:**
         toolbar_bkm_btn
         toolbar_help_btn
         
-        ** C.Output:**
+        ** B.Output:**
         toolbar_bkm-btn
         toolbar_help-btn
 
@@ -230,7 +230,7 @@ When comparing multiple Descriptions within the same group:
         - common keyword (located at the end, rule B) : pu6
         - different keywords : case1, case3
         
-        ** B, C.Output:**
+        ** A, B.Output:**
         case1_pg10-pu6
         case3_pg10-pu6
 
@@ -283,7 +283,7 @@ When comparing multiple Descriptions within the same group:
         u07-pg4_item19
         u07-pg7_item21
         u06a-popup1_txt4
-        u06a-popup1_txt4
+        u06a-popup1_txt3
         u21p2pu5-txt1
 
 ## Important Notes ##
@@ -430,10 +430,10 @@ When comparing multiple Descriptions within the same group:
 ### Priority 1: Special Character Processing
     - '|' (pipe): Convert to '_' by default to connect
     - Extract detailed information from Description
-    - If detailed variable is a single number, connect 'SI' + 'DI'
+    - If detailed variable is a single number, connect 'SV' + 'DI'
     
     id=pg10|action=open -> id=pg10_open (connect only detailed information 'open')
-    id=inclue_btn30|index=4 -> id=include_btn30_index4 (connect system variable 'index' with single number 4)
+    id=include_btn30|index=4 -> id=include_btn30_index4 (connect system variable 'index' with single number 4)
 
 
 ### Priority 2: Classify Description into common keywords and different keywords.
@@ -565,11 +565,11 @@ When comparing multiple Descriptions within the same group:
         - common keyword (located in the middle, rule A) : pu6
         - different keywords : pg4, pg7, okbtn, cancelbtn
         
-        ** A.Output:**
+        ** C.Output:**
         u07-pg4_pu6_okbtn
         u07-pg7_pu6_cancelbtn
         
-        ** B.Output:**
+        ** A.Output:**
         u07-pg4_pu6-okbtn
         u07-pg7_pu6-cancelbtn
         
@@ -583,11 +583,11 @@ When comparing multiple Descriptions within the same group:
         - common keyword (located at the end, rule B) : btn 
         - different keywords : bkm, help
         
-        ** A.Output:**
+        ** C.Output:**
         toolbar_bkm_btn
         toolbar_help_btn
         
-        ** C.Output:**
+        ** B.Output:**
         toolbar_bkm-btn
         toolbar_help-btn
 
@@ -601,7 +601,7 @@ When comparing multiple Descriptions within the same group:
         - common keyword (located at the end, rule B) : pu6
         - different keywords : case1, case3
         
-        ** B, C.Output:**
+        ** A, B.Output:**
         case1_pg10-pu6
         case3_pg10-pu6
 
@@ -654,7 +654,7 @@ When comparing multiple Descriptions within the same group:
         u07-pg4_item19
         u07-pg7_item21
         u06a-popup1_txt4
-        u06a-popup1_txt4
+        u06a-popup1_txt3
         u21p2pu5-txt1
 
 ## Important Notes ##
